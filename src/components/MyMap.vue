@@ -211,7 +211,7 @@ const initRainSymbol = (cor) => {
 let dis = []
 const points = []
 const cord=[]
-// 初始划下雨
+// 初始划下雨~
 const initRain = () => {
   const count = 500
   for (let i = 0; i < count; i++){
