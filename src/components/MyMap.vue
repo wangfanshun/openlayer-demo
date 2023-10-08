@@ -20,13 +20,13 @@ import GeoJSON from 'ol/format/GeoJSON.js';
 import Control from 'ol/control/Control.js';
 import { Circle, Fill, Stroke, Style } from 'ol/style.js';
 import { onMounted } from 'vue'
-let map, extent, sliderControl, fullScreenControl, markLayer
-const markerSource = new VectorSource()
+let map, extent, sliderControl, fullScreenControl, markLayer, markerSource
 const orZoom = 12
 const orCenter = [114.30, 30.50]
 const blackMap= new TileLayer({
   source: new XYZ({
-    url: 'https://webst01.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}'
+    // url: 'http://wprd0{1-4}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&style=7&x={x}&y={y}&z={z}'
+    url: 'https://mt1.google.com/vt/lyrs=t&x={x}&y={y}&z={z}'
   }),
   visible:false
 })
@@ -50,7 +50,14 @@ const initMap = () => {
       projection: 'EPSG:4326'
     })
   })
-  window.map=map
+  markerSource = new VectorSource()
+  markLayer = new VectorLayer({
+    source: markerSource,
+    minZoom: 11,
+    maxZoom: 13,
+    id: 'markLayer'
+  })
+  map.addLayer(markLayer)
 }
 // 初始化extent控件
 const initExtent = () => {
@@ -82,9 +89,9 @@ const initSliderControl = () => {
   sliderControl = new ZoomSlider()
   map && map.addControl(sliderControl)
 }
-const initCircle = () => {
+const initCircle = (cor) => {
   const point = new Feature({
-    geometry: new Point(orCenter)
+    geometry: new Point(cor)
   })
   const style = new Style({
     image: new Circle({
@@ -103,22 +110,7 @@ const initCircle = () => {
     })
   })
   point.setStyle(style)
-  if (!markLayer) {
-    markLayer = new VectorLayer({
-      source: markerSource,
-      minZoom: 11,
-      maxZoom: 13,
-      style: new Style({
-        fill: new Fill({
-          color: "#ff2d51"
-        })
-      }),
-      id:'markLayer'
-    })
-    window.ly=markLayer
-  }
-  markerSource.addFeatures([point])
-  map.addLayer(markLayer)
+  markerSource.addFeature(point)
 }
 
 const loadGeoJson = (data) => {
@@ -163,7 +155,10 @@ const initClickEvent = () => {
   if (!map) return
   map.on('click', event => {
     const {coordinate, pixel } = event
-    console.log(coordinate, pixel)
+    initCircle(coordinate)
+    map.getView().animate({
+      center: coordinate
+    })
   })
 }
 const initSwitchButton = () => {
@@ -189,7 +184,7 @@ onMounted(() => {
   initExtent()
   initSliderControl()
   initFullScreen()
-  initCircle()
+  initCircle(orCenter)
   initClickEvent()
   loadGeoJson(geojsonData)
   initSwitchButton()
