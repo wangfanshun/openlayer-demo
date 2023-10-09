@@ -2,7 +2,8 @@
   <div id="map">
   </div>
   <button class="switch_rain" @click="closeRain">关闭局部雨滴</button>
-    <button class="switch_webgl" @click="closeRain">webgl渲染的雨滴</button>
+  <button class="switch_webgl" @click="closeRain">webgl渲染的雨滴</button>
+  <div id="tiny_map"></div>
 </template>
 
 <script setup>
@@ -25,7 +26,7 @@ import { Circle, Fill, Stroke, Style } from 'ol/style.js';
 import Icon from 'ol/style/Icon.js';
 import rainUrl from '@/assets/rain.png'
 import { onMounted } from 'vue'
-let map, extent, sliderControl, fullScreenControl, markLayer, markerSource, rainLayer, rainSource, orScope
+let map, tinyMap, extent, sliderControl, fullScreenControl, markLayer, markerSource, rainLayer, rainSource, orScope
 const orZoom = 12
 const orCenter = [114.30, 30.50]
 const blackMap= new TileLayer({
@@ -82,6 +83,28 @@ const initMap = () => {
   })
   map.addLayer(rainLayer)
   map.addLayer(markLayer)
+}
+const initTinyMap = () => {
+  tinyMap = new Map({
+  target: 'tiny_map',
+  layers: [new TileLayer({
+    source: new XYZ({
+      url: 'https://webst01.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}'
+    })
+  })],
+  view: new View({
+    center: orCenter,
+    zoom: orZoom,
+    projection: 'EPSG:4326'
+  })
+  })
+  const tinyView=tinyMap.getView()
+  map.getView().on('change', (e) => {
+    const mainView = e.target
+    tinyView.setCenter(mainView.getCenter())
+    tinyView.setZoom(mainView.getZoom()+2)
+
+  })
 }
 // 初始化extent控件
 const initExtent = () => {
@@ -251,6 +274,7 @@ const closeRain = () => {
 }
 onMounted(() => {
   initMap()
+  initTinyMap()
   initExtent()
   initSliderControl()
   initFullScreen()
@@ -297,5 +321,13 @@ onMounted(() => {
   position: absolute;
   right: 20.5em;
   top:1.5em
+}
+#tiny_map{
+  position: absolute;
+  left: 0em;
+  bottom:0em;
+  width: 500px;
+  height: 300px;
+  /* background-color: red; */
 }
 </style>
