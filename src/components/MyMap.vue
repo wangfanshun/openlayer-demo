@@ -196,6 +196,9 @@ const initClickEvent = () => {
       center: coordinate
     })
   })
+  // map.on('change:size', function (event) {
+  //   console.log(1234)
+  // });
 }
 // 切换底图
 const initSwitchButton = () => {
@@ -206,7 +209,7 @@ const initSwitchButton = () => {
     element: button
   })
   button.addEventListener('click', (e) => {
-    const layers = map.getAllLayers()
+    let layers = map.getAllLayers()
     layers.forEach(l => {
       if (l instanceof TileLayer) {
         const v=l.getVisible()
