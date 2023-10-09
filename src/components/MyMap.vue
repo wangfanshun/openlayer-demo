@@ -17,6 +17,7 @@ import ZoomSlider from 'ol/control/ZoomSlider.js';
 import FullScreen from 'ol/control/FullScreen.js';
 import Feature from 'ol/Feature.js';
 import Point from 'ol/geom/Point.js';
+import Polygon from 'ol/geom/Polygon.js';
 import VectorLayer from 'ol/layer/Vector.js';
 import VectorSource from 'ol/source/Vector.js';
 import Text from 'ol/style/Text.js';
@@ -25,8 +26,9 @@ import Control from 'ol/control/Control.js';
 import { Circle, Fill, Stroke, Style } from 'ol/style.js';
 import Icon from 'ol/style/Icon.js';
 import rainUrl from '@/assets/rain.png'
+import Collection from 'ol/Collection.js';
 import { onMounted } from 'vue'
-let map, tinyMap, extent, sliderControl, fullScreenControl, markLayer, markerSource, rainLayer, rainSource, orScope
+let map, tinyMap, extent, sliderControl, fullScreenControl, markLayer, markerSource, rainLayer, rainSource, orScope, tinyMapScopeLayer
 const orZoom = 12
 const orCenter = [114.30, 30.50]
 const blackMap= new TileLayer({
@@ -41,32 +43,27 @@ const regularMap= new TileLayer({
   }),
   visible: true,
 })
+let coordinates = [[
+  [114.2, 30.4],
+  [114.2, 30.6],
+  [114.4, 30.6],
+  [114.4, 30.4]
+]]
+const tinyMapExent = new Feature({
+  geometry: new Polygon(coordinates)
+})
+window.te = tinyMapExent
+tinyMapExent.setStyle(new Style({
+  fill: new Fill({
+    color: "rgba(0, 0, 0, 0.5)"
+  }),
+  stroke: new Stroke({
+    color: 'rgba(0, 0, 0, 0.5)', // 设置边框颜色和透明度
+    width: 2
+  })
+}))
 // 初始化地图
 const initMap = () => {
-  map = new Map({
-    target: 'map',
-    layers: [
-      blackMap,
-      regularMap
-    ],
-    view: new View({
-      center: orCenter,
-      zoom: orZoom,
-      projection: 'EPSG:4326'
-    })
-  })
-  //获取再zoomlevel等于12时候的分辨率（即每个像素点的长度）
-  const resolution = map.getView().getResolutionForZoom(orZoom)
-  //获取当前视图的像素大小
-  const width = map.getSize()[0] * resolution;
-  const height = map.getSize()[1] * resolution;
-  //计算出中心点为武汉时候的四个角的坐标
-  const minX = orCenter[0] - width / 2;
-  const minY = orCenter[1] - height / 2;
-  const maxX = orCenter[0] + width / 2;
-  const maxY = orCenter[1] + height / 2;
-  // 构建范围对象
-  orScope = [minX, minY, maxX, maxY];
   markerSource = new VectorSource()
   rainSource = new VectorSource()
   markLayer = new VectorLayer({
@@ -79,11 +76,51 @@ const initMap = () => {
     source: rainSource,
     opacity: 0.5,
     className: 'rain_mask',
-    visible:false
+    visible: false
   })
-  map.addLayer(rainLayer)
-  map.addLayer(markLayer)
+  tinyMapScopeLayer = new VectorLayer({
+    source: new VectorSource({
+      features: [tinyMapExent]
+    }),
+    visible: true,
+    id: 'tt_layer',
+    zIndex: 999999
+  })
+  map = new Map({
+    target: 'map',
+    layers: [
+      blackMap,
+      regularMap,
+      rainLayer,
+      tinyMapScopeLayer,
+      markLayer
+    ],
+    view: new View({
+      center: orCenter,
+      zoom: orZoom,
+      projection: 'EPSG:4326'
+    })
+  })
+  orScope = getMapBoundary(map, 12,orCenter)
+  window.mp = map
 }
+
+// 获取指定级别的底图编辑的坐标值
+const getMapBoundary = (map,zoom,center) => {
+    //获取再zoomlevel等于12时候的分辨率（即每个像素点的长度）
+  const resolution = map.getView().getResolutionForZoom(zoom)
+  //获取当前视图的像素大小
+  const width = map.getSize()[0] * resolution;
+  const height = map.getSize()[1] * resolution;
+  //计算出中心点为武汉时候的四个角的坐标
+  const minX = center[0] - width / 2;
+  const minY = center[1] - height / 2;
+  const maxX = center[0] + width / 2;
+  const maxY = center[1] + height / 2;
+  // 构建范围对象
+  return [minX, minY, maxX, maxY];
+}
+// 初始化小地图
 const initTinyMap = () => {
   tinyMap = new Map({
   target: 'tiny_map',
@@ -98,12 +135,23 @@ const initTinyMap = () => {
     projection: 'EPSG:4326'
   })
   })
-  const tinyView=tinyMap.getView()
+  const tinyView = tinyMap.getView()
+  tinyView.on('change:center', (e) => {
+    const tinyView = e.target
+    window.tv = e.target
+    const boundary = getMapBoundary(tinyMap, tinyView.getZoom(), tinyView.getCenter())
+    tinyMapExent.getGeometry().setCoordinates([[
+        [boundary[0], boundary[1]],
+        [boundary[0], boundary[3]],
+        [boundary[2], boundary[3]],
+        [boundary[2], boundary[1]],
+    ]])
+    console.log(getMapBoundary(tinyMap, tinyView.getZoom(), tinyView.getCenter()))
+  })
   map.getView().on('change', (e) => {
     const mainView = e.target
     tinyView.setCenter(mainView.getCenter())
-    tinyView.setZoom(mainView.getZoom()+2)
-
+    tinyView.setZoom(mainView.getZoom() + 2)
   })
 }
 // 初始化extent控件
@@ -196,9 +244,6 @@ const initClickEvent = () => {
       center: coordinate
     })
   })
-  // map.on('change:size', function (event) {
-  //   console.log(1234)
-  // });
 }
 // 切换底图
 const initSwitchButton = () => {
@@ -237,7 +282,7 @@ const initRainSymbol = (cor) => {
 let dis = []
 const points = []
 const cord=[]
-// 初始划下雨~
+// 初始划下雨
 const initRain = () => {
   const count = 500
   for (let i = 0; i < count; i++){
@@ -318,12 +363,12 @@ onMounted(() => {
 .switch_rain{
   position: absolute;
   right: 11.5em;
-  top:1.5em
+  top:0.5em
 }
 .switch_webgl{
   position: absolute;
   right: 20.5em;
-  top:1.5em
+  top:0.5em
 }
 #tiny_map{
   position: absolute;
