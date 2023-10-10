@@ -1,8 +1,10 @@
 <template>
   <div id="map">
+    <button class="switch_rain" @click="closeRain">关闭局部雨滴</button>
+    <button class="switch_webgl" @click="closeRain">webgl渲染的雨滴</button>
+    <div id="mouse_position"></div>
   </div>
-  <button class="switch_rain" @click="closeRain">关闭局部雨滴</button>
-  <button class="switch_webgl" @click="closeRain">webgl渲染的雨滴</button>
+
   <div id="tiny_map"></div>
 </template>
 
@@ -26,12 +28,9 @@ import Control from 'ol/control/Control.js';
 import { Circle, Fill, Stroke, Style } from 'ol/style.js';
 import Icon from 'ol/style/Icon.js';
 import rainUrl from '@/assets/rain.png'
-import * as TWEEN from '@tweenjs/tween.js'
-import { getVectorContext } from 'ol/render.js';
-import { easeOut } from 'ol/easing.js';
+import MousePosition from 'ol/control/MousePosition.js';
 import { onMounted } from 'vue'
 let map, tinyMap, extent, sliderControl, fullScreenControl, markLayer, markerSource, rainLayer, rainSource, orScope, tinyMapScopeLayer
-console.log(TWEEN, 'TWEEN')
 const orZoom = 12
 const orCenter = [114.30, 30.50]
 const blackMap= new TileLayer({
@@ -49,7 +48,6 @@ const regularMap= new TileLayer({
 const tinyMapExent = new Feature({
   geometry: new Polygon([[]])
 })
-window.te = tinyMapExent
 tinyMapExent.setStyle(new Style({
   fill: new Fill({
     color: "rgba(0, 0, 0, 0)"
@@ -61,6 +59,14 @@ tinyMapExent.setStyle(new Style({
 }))
 // 初始化地图
 const initMap = () => {
+  const mousInfoControl = new MousePosition({
+    coordinateFormat: (e) => {
+      console.log(e)
+      return `经度：${e[0].toFixed(2)},纬度：${e[0].toFixed(2)}`
+    },
+    target: document.getElementById('mouse_position'),
+    className:'info_style'
+  })
   markerSource = new VectorSource()
   rainSource = new VectorSource()
   markLayer = new VectorLayer({
@@ -96,7 +102,8 @@ const initMap = () => {
       center: orCenter,
       zoom: orZoom,
       projection: 'EPSG:4326'
-    })
+    }),
+    controls:[mousInfoControl]
   })
   orScope = getMapBoundary(map, 12,orCenter)
   window.mp = map
@@ -147,7 +154,6 @@ const initTinyMap = () => {
 
   let delay = null
   tinyView.on('change:center', (e) => {
-    console.log(tiler.getSource().state_)
     if (delay) clearTimeout(delay)
     delay = setTimeout(function () {
       const tinyView = e.target
@@ -358,7 +364,6 @@ const initRain = () => {
   window.ge=fea[0]
 }
 
-
 const time = new Array(500).fill(0)
 // 雨滴下落
 const rainFall = () => {
@@ -376,7 +381,6 @@ const rainFall = () => {
 }
 // 关闭雨图层
 const closeRain = () => {
-  console.log(1234)
   const v = rainLayer.getVisible()
   rainLayer.setVisible(!v)
 }
@@ -423,12 +427,14 @@ onMounted(() => {
 .switch_rain{
   position: absolute;
   right: 11.5em;
-  top:0.5em
+  top:0.5em;
+  z-index: 2;
 }
 .switch_webgl{
   position: absolute;
   right: 20.5em;
-  top:0.5em
+  top:0.5em;
+  z-index: 2;
 }
 #tiny_map{
   position: absolute;
@@ -437,5 +443,14 @@ onMounted(() => {
   width: 500px;
   height: 300px;
   /* background-color: red; */
+}
+#mouse_position{
+  position: absolute;
+  right: 0px;
+  bottom: 0px;
+  z-index: 2;
+}
+.info_style{
+  background-color: rgba(0,0,0,0.7);
 }
 </style>
