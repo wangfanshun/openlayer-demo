@@ -4,8 +4,7 @@
     <button class="switch_webgl" @click="closeRain">webgl渲染的雨滴</button>
     <div id="mouse_position"></div>
   </div>
-
-  <div id="tiny_map"></div>
+  <div id="tiny_map_container"></div>
 </template>
 
 <script setup>
@@ -29,15 +28,16 @@ import { Circle, Fill, Stroke, Style } from 'ol/style.js';
 import Icon from 'ol/style/Icon.js';
 import rainUrl from '@/assets/rain.png'
 import MousePosition from 'ol/control/MousePosition.js';
+import OverviewMap from 'ol/control/OverviewMap.js';
 import { onMounted } from 'vue'
 let map, tinyMap, extent, sliderControl, fullScreenControl, markLayer, markerSource, rainLayer, rainSource, orScope, tinyMapScopeLayer
 const orZoom = 12
 const orCenter = [114.30, 30.50]
-const blackMap= new TileLayer({
+const imageMap = new TileLayer({
   source: new XYZ({
     url: 'https://webst01.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}'
   }),
-  visible:false
+  visible: true,
 })
 const regularMap= new TileLayer({
   source: new XYZ({
@@ -61,11 +61,24 @@ tinyMapExent.setStyle(new Style({
 const initMap = () => {
   const mousInfoControl = new MousePosition({
     coordinateFormat: (e) => {
-      console.log(e)
       return `经度：${e[0].toFixed(2)},纬度：${e[0].toFixed(2)}`
     },
     target: document.getElementById('mouse_position'),
     className:'info_style'
+  })
+  const overViewControl = new OverviewMap({
+    collapsed: true,
+    className: 'tiny_map',
+    label: '折叠',
+    collapsible: true,
+    collapseLabel:'展开',
+    target: document.getElementById('tiny_map_container'),
+    layers: [new TileLayer({
+      source: new XYZ({
+        url: 'https://webst01.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}'
+      })
+      // visible: true
+    })]
   })
   markerSource = new VectorSource()
   rainSource = new VectorSource()
@@ -92,7 +105,7 @@ const initMap = () => {
   map = new Map({
     target: 'map',
     layers: [
-      blackMap,
+      imageMap,
       regularMap,
       rainLayer,
       tinyMapScopeLayer,
@@ -103,10 +116,9 @@ const initMap = () => {
       zoom: orZoom,
       projection: 'EPSG:4326'
     }),
-    controls:[mousInfoControl]
+    controls:[mousInfoControl, overViewControl]
   })
   orScope = getMapBoundary(map, 12,orCenter)
-  window.mp = map
 }
 
 // 获取指定级别的底图编辑的坐标值
@@ -132,7 +144,7 @@ const initTinyMap = () => {
     })
   })
   tinyMap = new Map({
-    target: 'tiny_map',
+    target: 'tiny_map_container',
     layers: [tiler],
     view: new View({
       center: orCenter,
@@ -311,6 +323,20 @@ const initClickEvent = () => {
     })
   })
 }
+const dragging = false
+const initClipEvent = () => {
+  // let start = false
+  let last
+  map.on('pointerdrag', (e) => {
+    const orE = e.originalEvent
+    console.log(e)
+    // 检查是否按下了 Ctrl 键
+    if (orE.ctrlKey) {
+      // dragging = true
+    }
+  })
+  map.on
+}
 // 切换底图
 const initSwitchButton = () => {
   const button = document.createElement('button')
@@ -386,7 +412,7 @@ const closeRain = () => {
 }
 onMounted(() => {
   initMap()
-  initTinyMap()
+  // initTinyMap()
   initExtent()
   initSliderControl()
   initFullScreen()
@@ -395,6 +421,7 @@ onMounted(() => {
   initSwitchButton()
   initRain()
   rainFall()
+  initClipEvent()
 })
 </script>
 
@@ -436,13 +463,13 @@ onMounted(() => {
   top:0.5em;
   z-index: 2;
 }
-#tiny_map{
+#tiny_map_container{
   position: absolute;
   left: 0em;
   bottom:0em;
   width: 500px;
   height: 300px;
-  /* background-color: red; */
+  z-index: 2;
 }
 #mouse_position{
   position: absolute;
@@ -453,5 +480,22 @@ onMounted(() => {
 .info_style{
   background-color: rgba(0,0,0,0.7);
   color: #fff;
+}
+.tiny_map{
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+.tiny_map>button{
+  position: absolute;
+  padding: 0px 10px;
+  left: 0px;
+  bottom: 0px;
+  width: fit-content;
+}
+.ol-overviewmap-map{
+  width: 100%;
+  height: 100%;
+
 }
 </style>
