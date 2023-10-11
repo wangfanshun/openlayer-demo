@@ -452,5 +452,6 @@ onMounted(() => {
 }
 .info_style{
   background-color: rgba(0,0,0,0.7);
+  color: #fff;
 }
 </style>
