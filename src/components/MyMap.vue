@@ -37,13 +37,14 @@ const imageMap = new TileLayer({
   source: new XYZ({
     url: 'https://webst01.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}'
   }),
-  visible: true,
+  visible: false,
 })
 const regularMap= new TileLayer({
   source: new XYZ({
     url: 'http://wprd0{1-4}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&style=7&x={x}&y={y}&z={z}'
   }),
   visible: true,
+  id:'regularMap'
 })
 const tinyMapExent = new Feature({
   geometry: new Polygon([[]])
@@ -77,7 +78,6 @@ const initMap = () => {
       source: new XYZ({
         url: 'https://webst01.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}'
       })
-      // visible: true
     })]
   })
   markerSource = new VectorSource()
@@ -107,9 +107,9 @@ const initMap = () => {
     layers: [
       imageMap,
       regularMap,
-      rainLayer,
-      tinyMapScopeLayer,
-      markLayer
+      // rainLayer,
+      // tinyMapScopeLayer,
+      // markLayer
     ],
     view: new View({
       center: orCenter,
@@ -118,6 +118,7 @@ const initMap = () => {
     }),
     controls:[mousInfoControl, overViewControl]
   })
+  window.mp = map
   orScope = getMapBoundary(map, 12,orCenter)
 }
 
@@ -135,102 +136,6 @@ const getMapBoundary = (map,zoom,center) => {
   const maxY = center[1] + height / 2;
   // 构建范围对象
   return [minX, minY, maxX, maxY];
-}
-// 初始化小地图
-const initTinyMap = () => {
-  const tiler= new TileLayer({
-    source: new XYZ({
-      url: 'https://webst01.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}'
-    })
-  })
-  tinyMap = new Map({
-    target: 'tiny_map_container',
-    layers: [tiler],
-    view: new View({
-      center: orCenter,
-      zoom: orZoom,
-      projection: 'EPSG:4326'
-    })
-  })
-  window.tyMp= tinyMap
-  const tinyView = tinyMap.getView()
-  tinyMap.on('loadend', () => {
-    const boundary = getMapBoundary(tinyMap, tinyView.getZoom(), tinyView.getCenter())
-    tinyMapExent.getGeometry().setCoordinates([[
-      [boundary[0], boundary[1]],
-      [boundary[0], boundary[3]],
-      [boundary[2], boundary[3]],
-      [boundary[2], boundary[1]],
-    ]])
-  })
-
-  let delay = null
-  tinyView.on('change:center', (e) => {
-    if (delay) clearTimeout(delay)
-    delay = setTimeout(function () {
-      const tinyView = e.target
-      window.tv = e.target
-      let opacity = 0.5
-      let fade = true
-      let seted = false
-      const animation = () => {
-        if (opacity < 0) {
-          fade = false
-        }
-        if (fade) {
-          tinyMapExent.setStyle(new Style({
-            fill: new Fill({
-              color: `rgba(0, 0, 0, ${opacity})`
-            }),
-            stroke: new Stroke({
-              color: `rgba(0, 0, 0, ${opacity})`, // 设置边框颜色和透明度
-              width: 2
-            })
-          }))
-          opacity -= 0.005
-          requestAnimationFrame(animation)
-        } else if (!fade && opacity < 0.5) {
-          if (!seted) {
-            const boundary = getMapBoundary(tinyMap, tinyView.getZoom(), tinyView.getCenter())
-            tinyMapExent.getGeometry().setCoordinates([[
-              [boundary[0], boundary[1]],
-              [boundary[0], boundary[3]],
-              [boundary[2], boundary[3]],
-              [boundary[2], boundary[1]],
-            ]])
-            seted = true
-          }
-          tinyMapExent.setStyle(new Style({
-            fill: new Fill({
-              color: `rgba(0, 0, 0, ${opacity})`
-            }),
-            stroke: new Stroke({
-              color: `rgba(0, 0, 0, ${opacity})`, // 设置边框颜色和透明度
-              width: 2
-            })
-          }))
-          opacity += 0.005
-          requestAnimationFrame(animation)
-        } else {
-          return
-        }
-      }
-      animation()
-    },300)
-    // const boundary = getMapBoundary(tinyMap, tinyView.getZoom(), tinyView.getCenter())
-    // tinyMapExent.getGeometry().setCoordinates([[
-    //     [boundary[0], boundary[1]],
-    //     [boundary[0], boundary[3]],
-    //     [boundary[2], boundary[3]],
-    //     [boundary[2], boundary[1]],
-    // ]])
-    // const style=new style
-  })
-  map.getView().on('change', (e) => {
-    const mainView = e.target
-    tinyView.setCenter(mainView.getCenter())
-    tinyView.setZoom(mainView.getZoom() + 2)
-  })
 }
 // 初始化extent控件
 const initExtent = () => {
@@ -323,19 +228,35 @@ const initClickEvent = () => {
     })
   })
 }
-const dragging = false
 const initClipEvent = () => {
-  // let start = false
-  let last
-  map.on('pointerdrag', (e) => {
-    const orE = e.originalEvent
-    console.log(e)
-    // 检查是否按下了 Ctrl 键
-    if (orE.ctrlKey) {
-      // dragging = true
+  let range
+  let dragging = false
+  let startX, startY
+  const rootDom = document.getElementById('map')
+  rootDom.addEventListener('mousedown', (e) => {
+    if (e.altKey) {
+      dragging = true
+      startX = e.offsetX
+      startY = e.offsetY
     }
   })
-  map.on
+  rootDom.addEventListener('mouseup', (e) => {
+    dragging = false
+  })
+  rootDom.addEventListener('mousemove', (event) => {
+    if (dragging) {
+      const ctx = regularMap.getRenderer().context;
+      // ctx.restore()
+      const newX = event.offsetX
+      const newY = event.offsetY
+      const dis = Math.sqrt((newX - startX) * (newX - startX) + (newY - startY) * (newY - startY))
+      ctx.beginPath(); // 开始绘制路径
+      ctx.arc(startX, startY, dis, 0, 2 * Math.PI); // 绘制圆形
+      // ctx.fillStyle = 'rgba(0, 0, 255, 0.5)'; // 设置填充颜色
+      // ctx.fill(); // 填充圆形
+      ctx.clip()
+    }
+  })
 }
 // 切换底图
 const initSwitchButton = () => {
@@ -412,7 +333,6 @@ const closeRain = () => {
 }
 onMounted(() => {
   initMap()
-  // initTinyMap()
   initExtent()
   initSliderControl()
   initFullScreen()
