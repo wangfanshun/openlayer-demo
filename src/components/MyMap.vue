@@ -6,9 +6,12 @@
     <button class="toBeijing_f" @click="flexbeijing">北京（弹性）</button>
     <button class="m_length" @click="changMMode('length')">测距离</button>
     <button class="m_area" @click="changMMode('area')">测面积</button>
+    <button class="edit_button" @click="enableEdit">{{ activeEdit?'取消编辑':'编辑测量的图形' }}</button>
+    <span class="tips">alt+移动可查看底部图层</span>
     <div id="mouse_position"></div>
   </div>
   <div id="tiny_map_container"></div>
+  <div id="scale_container"></div>
 </template>
 
 <script setup>
@@ -39,13 +42,16 @@ import Draw from 'ol/interaction/Draw.js';
 import { unByKey } from 'ol/Observable.js';
 import Overlay from 'ol/Overlay.js';
 import { getLength, getArea } from 'ol/sphere';
-import { onMounted } from 'vue'
+import ScaleLine from 'ol/control/ScaleLine.js';
+import Select from 'ol/interaction/Select.js'
+import Modifier from './modify'
+import { onMounted, ref } from 'vue'
 let map, tinyMap, extent, sliderControl, fullScreenControl, markLayer, markerSource, rainLayer, rainSource, orScope, tinyMapScopeLayer
 let dragging = false
 let mousePosition = []
 let startX, startY
 let circleInfo = []
-const orZoom = 12
+const orZoom = 5
 const orCenter = [114.30, 30.50]
 const imageMap = new TileLayer({
   source: new XYZ({
@@ -72,6 +78,7 @@ tinyMapExent.setStyle(new Style({
     width: 2
   })
 }))
+let modifier
 const drawSource = new VectorSource()
 const drawLayer = new VectorLayer({
   source: drawSource
@@ -84,6 +91,11 @@ const initMap = () => {
     },
     target: document.getElementById('mouse_position'),
     className: 'info_style'
+  })
+  const selector= new Select()
+  const scaleControl = new ScaleLine({
+    target: document.getElementById('scale_container'),
+    unit: 'metric'
   })
   const overViewControl = new OverviewMap({
     collapsed: true,
@@ -135,8 +147,11 @@ const initMap = () => {
       zoom: orZoom,
       projection: 'EPSG:4326'
     }),
-    controls: [mousInfoControl, overViewControl]
+    controls: [mousInfoControl, overViewControl, scaleControl]
   })
+  modifier = new Modifier(map, drawSource)
+  map.addInteraction(selector)
+  window.sel = selector
   window.mp = map
   const container = document.getElementById('map')
   container.addEventListener('mousemove', (e) => {
@@ -172,7 +187,11 @@ const initMap = () => {
   })
   orScope = getMapBoundary(map, 12, orCenter)
 }
-
+const activeEdit = ref(false)
+const enableEdit = () => {
+  activeEdit.value = !activeEdit.value
+  modifier.setActive(activeEdit.value)
+}
 // 获取指定级别的底图编辑的坐标值
 const getMapBoundary = (map, zoom, center) => {
   //获取再zoomlevel等于12时候的分辨率（即每个像素点的长度）
@@ -573,6 +592,21 @@ onMounted(() => {
   top: 0.5em;
   z-index: 2;
 }
+.edit_button{
+  position: absolute;
+  right: 70.5em;
+  top: 0.5em;
+  z-index: 2;
+}
+.tips{
+  position: absolute;
+  right: 80.5em;
+  top: 0.5em;
+  z-index: 2;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  padding: 5px;
+}
 #tiny_map_container {
   position: absolute;
   left: 0em;
@@ -581,7 +615,17 @@ onMounted(() => {
   height: 300px;
   z-index: 2;
 }
-
+#scale_container{
+  position: absolute;
+  left: 50vw;
+  bottom: 0vh;
+  /* width: 500px;
+  height: 300px; */
+  z-index: 3;
+  transform: translate(-50%);
+  color:#fff;
+  background-color: rgba(0, 0, 0, 0.7);
+}
 #mouse_position {
   position: absolute;
   right: 0px;
