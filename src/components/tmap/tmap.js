@@ -2,7 +2,7 @@
  * @Author: wangfs wangfs@jurassic.com.cn
  * @Date: 2023-10-23 08:52:26
  * @LastEditors: wangfs wangfs@jurassic.com.cn
- * @LastEditTime: 2023-10-25 12:54:22
+ * @LastEditTime: 2023-10-25 15:03:23
  * @FilePath: \openlayer-demo2\src\components\tmap\tmap.js
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -36,8 +36,8 @@ export default class dyMap {
   constructor() {
     this.map = null
     this.layers = {}
+    this.listener = {}
     this.initMap()
-    this.activeEduLayer()
   }
   initMap() {
     const regularMap = new TileLayer({
@@ -89,12 +89,14 @@ export default class dyMap {
     return [minX, minY, maxX, maxY];
   }
   activeEduLayer() {
-    const view = this.map.getView()
-    this.map.on('moveend', (e) => {
-      if (this.layers.eduLayer) {
-        this.map.removeLayer(this.layers.eduLayer)
-        this.layers.eduLayer = null
+    this.layers.eduLayer = new VectorLayer({
+      properties: {
+        name: 'cluster'
       }
+    })
+    this.map.addLayer(this.layers.eduLayer)
+    const view = this.map.getView()
+    this.listener.eduListener = this.map.on('moveend', (e) => {
       const zoom = view.getZoom()
       const bd = this.getBoundary()
       axios({
@@ -105,7 +107,7 @@ export default class dyMap {
         }
       }).then(res => {
         if (res.data) {
-          const features = []
+          let features = []
           const points = res.data.pois || []
           points.forEach(p => {
             let coordinates = p.lonlat.split(',')
@@ -120,37 +122,71 @@ export default class dyMap {
             distance: parseInt(60, 10), // 聚合点与点之间的距离
             source: source,
           })
-          this.layers.eduLayer = new VectorLayer({
-            source: clusterSource,
-            // 聚合样式
-            style: function (feature) {
-              console.log(9999)
-              // 点的个数
-              const size = feature.get('features').length
-              return new Style({
-                image: new Circle({ // 圆形
-                  radius: 15, // 半径
-                  stroke: new Stroke({ // 边框
-                    color: '#fff'
-                  }),
-                  fill: new Fill({ // 填充
-                    color: '#3399CC'
-                  })
+          const layer = this.map.getAllLayers().find(l => l.get('name') === 'cluster')
+          layer.setSource(clusterSource)
+          layer.setStyle(function (feature) {
+            // 点的个数
+            const size = feature.get('features').length
+            return new Style({
+              image: new Circle({ // 圆形
+                radius: 15, // 半径
+                stroke: new Stroke({ // 边框
+                  color: '#fff'
                 }),
-                text: new Text({ // 文字样式
-                  font: '15px sans-serif',
-                  text: size.toString(),
-                  fill: new Fill({
-                    color: '#fff'
-                  })
+                fill: new Fill({ // 填充
+                  color: '#3399CC'
+                })
+              }),
+              text: new Text({ // 文字样式
+                font: '15px sans-serif',
+                text: size.toString(),
+                fill: new Fill({
+                  color: '#fff'
                 })
               })
-            }
+            })
           })
-          this.map.addLayer(this.layers.eduLayer)
+          this.layers.eduLayer = layer
           this.map.render()
         }
       })
+    })
+    this.map.dispatchEvent('moveend')
+  }
+  disConnectEduLayer() {
+    this.map.removeLayer(this.layers.eduLayer)
+    // this.map.un('moveend', this.listener.eduListener)
+    unByKey(this.listener.eduListener)
+    this.listener.eduListener = null
+    this.map.render()
+  }
+  getProvinceBorder() {
+    axios({
+      method: 'get',
+      url: 'https://zhfw.tianditu.gov.cn/zhfw/silkline?line=sea_silk'
+    }).then(res => {
+      const geoData = res.data.line
+      console.log(geoData, 'dasdasdas')
+      const reader = new GeoJSON()
+      const features = reader.readFeatures(JSON.parse(geoData))
+      console.log(features, 'fffff')
+      // window.ffff = features
+      const vectorSource = new VectorSource({
+        features: features
+      })
+
+      // 创建一个矢量图层
+      const vectorLayer = new VectorLayer({
+        source: vectorSource,
+        style: new Style({
+          stroke: new Stroke({
+            color: '#553256',
+            width: 5,
+          })
+        })
+      })
+      this.map.addLayer(vectorLayer)
+      this.map.render()
     })
   }
 }
