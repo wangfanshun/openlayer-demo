@@ -1,64 +1,101 @@
+import Feature from 'ol/Feature.js';
 import Map from 'ol/Map.js';
+import Point from 'ol/geom/Point.js';
 import View from 'ol/View.js';
-import { Draw, Modify, Snap } from 'ol/interaction.js';
-import { OSM, Vector as VectorSource } from 'ol/source.js';
+import {
+  Circle as CircleStyle,
+  Fill,
+  Stroke,
+  Style,
+  Text,
+} from 'ol/style.js';
+import { Cluster, OSM, Vector as VectorSource } from 'ol/source.js';
 import { Tile as TileLayer, Vector as VectorLayer } from 'ol/layer.js';
-import { get } from 'ol/proj.js';
+import { boundingExtent } from 'ol/extent.js';
+
+const distanceInput = document.getElementById('distance');
+const minDistanceInput = document.getElementById('min-distance');
+
+const count = 20000;
+const features = new Array(count);
+const e = 4500000;
+for (let i = 0; i < count; ++i) {
+  const coordinates = [2 * e * Math.random() - e, 2 * e * Math.random() - e];
+  features[i] = new Feature(new Point(coordinates));
+}
+
+const source = new VectorSource({
+  features: features,
+});
+
+const clusterSource = new Cluster({
+  distance: parseInt(distanceInput.value, 10),
+  minDistance: parseInt(minDistanceInput.value, 10),
+  source: source,
+});
+
+const styleCache = {};
+const clusters = new VectorLayer({
+  source: clusterSource,
+  style: function (feature) {
+    const size = feature.get('features').length;
+    let style = styleCache[size];
+    if (!style) {
+      style = new Style({
+        image: new CircleStyle({
+          radius: 10,
+          stroke: new Stroke({
+            color: '#fff',
+          }),
+          fill: new Fill({
+            color: '#3399CC',
+          }),
+        }),
+        text: new Text({
+          text: size.toString(),
+          fill: new Fill({
+            color: '#fff',
+          }),
+        }),
+      });
+      styleCache[size] = style;
+    }
+    return style;
+  },
+});
 
 const raster = new TileLayer({
   source: new OSM(),
 });
 
-const source = new VectorSource();
-const vector = new VectorLayer({
-  source: source,
-  style: {
-    'fill-color': 'rgba(255, 255, 255, 0.2)',
-    'stroke-color': '#ffcc33',
-    'stroke-width': 2,
-    'circle-radius': 7,
-    'circle-fill-color': '#ffcc33',
-  },
-});
-
-// Limit multi-world panning to one world east and west of the real world.
-// Geometry coordinates have to be within that range.
-const extent = get('EPSG:3857').getExtent().slice();
-extent[0] += extent[0];
-extent[2] += extent[2];
 const map = new Map({
-  layers: [raster, vector],
+  layers: [raster, clusters],
   target: 'map',
   view: new View({
-    center: [-11000000, 4600000],
-    zoom: 4,
-    extent,
+    center: [0, 0],
+    zoom: 2,
   }),
 });
 
-const modify = new Modify({ source: source });
-map.addInteraction(modify);
+distanceInput.addEventListener('input', function () {
+  clusterSource.setDistance(parseInt(distanceInput.value, 10));
+});
 
-let draw, snap; // global so we can remove them later
-const typeSelect = document.getElementById('type');
+minDistanceInput.addEventListener('input', function () {
+  clusterSource.setMinDistance(parseInt(minDistanceInput.value, 10));
+});
 
-function addInteractions() {
-  draw = new Draw({
-    source: source,
-    type: typeSelect.value,
+map.on('click', (e) => {
+  clusters.getFeatures(e.pixel).then((clickedFeatures) => {
+    if (clickedFeatures.length) {
+      // Get clustered Coordinates
+      const features = clickedFeatures[0].get('features');
+      if (features.length > 1) {
+        const extent = boundingExtent(
+          features.map((r) => r.getGeometry().getCoordinates())
+        );
+        map.getView().fit(extent, { duration: 1000, padding: [50, 50, 50, 50] });
+      }
+    }
   });
-  map.addInteraction(draw);
-  snap = new Snap({ source: source });
-  map.addInteraction(snap);
-}
-
-/**
- * Handle change event.
- */
-typeSelect.onchange = function () {
-  map.removeInteraction(draw);
-  map.removeInteraction(snap);
-  addInteractions();
-};
-
-addInteractions();
+});

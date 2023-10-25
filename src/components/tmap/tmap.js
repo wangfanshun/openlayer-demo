@@ -2,7 +2,7 @@
  * @Author: wangfs wangfs@jurassic.com.cn
  * @Date: 2023-10-23 08:52:26
  * @LastEditors: wangfs wangfs@jurassic.com.cn
- * @LastEditTime: 2023-10-24 21:06:18
+ * @LastEditTime: 2023-10-25 12:45:35
  * @FilePath: \openlayer-demo2\src\components\tmap\tmap.js
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -64,7 +64,7 @@ export default class dyMap {
       ],
       view: new View({
         center: [114.30, 30.50],
-        zoom: 2,
+        zoom: 15,
         projection: 'EPSG:4326',
         constrainResolution: true
       })
@@ -89,23 +89,14 @@ export default class dyMap {
     return [minX, minY, maxX, maxY];
   }
   activeEduLayer() {
-    if (!this.layers.eduLayer) {
-      this.layers.eduLayer = new VectorLayer({
-        source: new Cluster({
-          distance: parseInt(40, 10),
-          source: new VectorSource({
-            features: [new Feature()]
-          })
-        })
-      })
-      this.map.addLayer(this.layers.eduLayer)
-    }
     const view = this.map.getView()
     this.map.on('moveend', (e) => {
+      if (this.layers.eduLayer) {
+        this.map.removeLayer(this.layers.eduLayer)
+        this.layers.eduLayer = null
+      }
       const zoom = view.getZoom()
       const bd = this.getBoundary()
-      const features = this.layers.eduLayer.getSource().getFeatures()
-      console.log(features, 'feeee')
       axios({
         method: 'get',
         url: 'https://zhfw.tianditu.gov.cn/zhfw/adminsearch',
@@ -114,14 +105,49 @@ export default class dyMap {
         }
       }).then(res => {
         if (res.data) {
+          const features = []
           const points = res.data.pois || []
-          // points.forEach
-          features.length = 0
           points.forEach(p => {
-            const coordinates = p.lonlat.split(',')
+            let coordinates = p.lonlat.split(',')
+            coordinates = coordinates.map(i => Number(i))
             features.push(new Feature(new Point(coordinates)))
           })
-          console.log(features, 'dddd')
+          const source = new VectorSource({
+            features
+          })
+          // Cluster聚合类
+          const clusterSource = new Cluster({
+            distance: parseInt(60, 10), // 聚合点与点之间的距离
+            source: source,
+          })
+          this.layers.eduLayer = new VectorLayer({
+            source: clusterSource,
+            // 聚合样式
+            style: function (feature) {
+              console.log(9999)
+              // 点的个数
+              const size = feature.get('features').length
+              return new Style({
+                image: new Circle({ // 圆形
+                  radius: 15, // 半径
+                  stroke: new Stroke({ // 边框
+                    color: '#fff'
+                  }),
+                  fill: new Fill({ // 填充
+                    color: '#3399CC'
+                  })
+                }),
+                text: new Text({ // 文字样式
+                  font: '15px sans-serif',
+                  text: size.toString(),
+                  fill: new Fill({
+                    color: '#fff'
+                  })
+                })
+              })
+            }
+          })
+          this.map.addLayer(this.layers.eduLayer)
           this.map.render()
         }
       })
