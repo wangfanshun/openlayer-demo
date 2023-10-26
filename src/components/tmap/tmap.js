@@ -2,7 +2,7 @@
  * @Author: wangfs wangfs@jurassic.com.cn
  * @Date: 2023-10-23 08:52:26
  * @LastEditors: wangfs wangfs@jurassic.com.cn
- * @LastEditTime: 2023-10-25 15:03:23
+ * @LastEditTime: 2023-10-26 20:28:12
  * @FilePath: \openlayer-demo2\src\components\tmap\tmap.js
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -32,6 +32,7 @@ import Overlay from 'ol/Overlay.js';
 import { getLength } from 'ol/sphere';
 import Cluster from 'ol/source/Cluster.js';
 import axios from 'axios'
+import shpjs from 'shpjs'
 export default class dyMap {
   constructor() {
     this.map = null
@@ -160,7 +161,7 @@ export default class dyMap {
     this.listener.eduListener = null
     this.map.render()
   }
-  getProvinceBorder() {
+  getRoad() {
     axios({
       method: 'get',
       url: 'https://zhfw.tianditu.gov.cn/zhfw/silkline?line=sea_silk'
@@ -170,7 +171,6 @@ export default class dyMap {
       const reader = new GeoJSON()
       const features = reader.readFeatures(JSON.parse(geoData))
       console.log(features, 'fffff')
-      // window.ffff = features
       const vectorSource = new VectorSource({
         features: features
       })
@@ -188,5 +188,9 @@ export default class dyMap {
       this.map.addLayer(vectorLayer)
       this.map.render()
     })
+  }
+  async paserShp(buffer) {
+    const geojson = await shpjs(buffer)
+    console.log(geojson)
   }
 }
